@@ -8,6 +8,7 @@ from ..models.analysis_result import (
     FitStatus,
     KeyPassing,
 )
+from .metrics import calculate_metrics
 
 
 def compare_results(current: AnalysisResult, baseline: AnalysisResult) -> ComparisonResult:
@@ -55,6 +56,10 @@ def compare_results(current: AnalysisResult, baseline: AnalysisResult) -> Compar
         diagnostics.append(
             Diagnostic("DELTA_Q_UNAVAILABLE", "Two successful interior fits required")
         )
+    if tuple(k.particle_size_um for k in current.key_passing) != tuple(
+        k.particle_size_um for k in baseline.key_passing
+    ):
+        raise IncompatibleComparisonError("Key-size grids differ")
     keys = tuple(
         KeyPassing(
             a.particle_size_um,
@@ -67,11 +72,18 @@ def compare_results(current: AnalysisResult, baseline: AnalysisResult) -> Compar
         )
         for a, b in zip(current.key_passing, baseline.key_passing, strict=True)
     )
+    metrics = calculate_metrics(
+        tuple(p for p in current.mixed_curve.cumulative_passing if p is not None),
+        tuple(p for p in baseline.mixed_curve.cumulative_passing if p is not None),
+    )
     return ComparisonResult(
         current.mixed_curve.particle_size_um,
         delta,
         dq,
         keys,
-        max(abs(d) for d in delta),
+        metrics.max_absolute_deviation,
         tuple(diagnostics),
+        baseline=baseline,
+        current=current,
+        metrics=metrics,
     )

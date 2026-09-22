@@ -6,11 +6,13 @@ iniconfig==2.3.0
 librt==0.15.0
 mypy==2.3.1
 mypy-extensions==1.1.0
+narwhals==2.26.0
 numpy==2.3.5
 openpyxl==3.1.5
 packaging==26.3
 pathspec==1.1.1
 pluggy==1.6.0
+plotly==6.9.0
 pygments==2.21.0
 pytest==9.1.1
 pytest-cov==7.1.0

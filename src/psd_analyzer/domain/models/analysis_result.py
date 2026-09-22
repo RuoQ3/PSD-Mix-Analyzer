@@ -6,8 +6,8 @@ from enum import StrEnum
 from ..exceptions import DomainValidationError
 from ..validation import finite, sizes
 from .analysis_profile import AnalysisProfile
-from .psd import DistributionBasis
-from .recipe import MixtureComponent
+from .psd import PSD, DistributionBasis
+from .recipe import MixtureComponent, RecipeVersion
 
 
 class FitStatus(StrEnum):
@@ -125,7 +125,36 @@ class AnalysisResult:
     diagnostics: tuple[Diagnostic, ...]
     actual_weights: tuple[float, ...]
     input_fraction_sum: float
-    algorithm_version: str = "domain-core-0.2.0"
+    algorithm_version: str = "domain-core-0.3.0"
+    recipe: RecipeVersion | None = None
+    is_simulation: bool = False
+
+    @property
+    def mixed_psd(self) -> PSD | None:
+        """Complete domain PSD, or None for legacy analyses with missing coverage."""
+        return self._complete_psd(self.mixed_curve)
+
+    @property
+    def target_psd(self) -> PSD | None:
+        return self._complete_psd(self.target_curve)
+
+    @staticmethod
+    def _complete_psd(curve: EvaluatedCurve | None) -> PSD | None:
+        if curve is None or not curve.complete:
+            return None
+        return PSD(
+            curve.particle_size_um,
+            tuple(p for p in curve.cumulative_passing if p is not None),
+            curve.basis,
+        )
+
+    @property
+    def equivalent_q(self) -> float | None:
+        return self.fit.equivalent_q
+
+    @property
+    def target_q(self) -> float | None:
+        return self.profile.target_q
 
 
 @dataclass(frozen=True)
@@ -136,3 +165,6 @@ class ComparisonResult:
     key_delta: tuple[KeyPassing, ...]
     max_absolute_deviation: float
     diagnostics: tuple[Diagnostic, ...] = ()
+    baseline: AnalysisResult | None = None
+    current: AnalysisResult | None = None
+    metrics: ErrorMetrics | None = None

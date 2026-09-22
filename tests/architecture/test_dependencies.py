@@ -8,6 +8,85 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def _assert_import_boundary(directory, forbidden):
+    for source in directory.rglob("*.py"):
+        for node in ast.walk(ast.parse(source.read_text())):
+            names = []
+            if isinstance(node, ast.Import):
+                names = [item.name for item in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                names = [module, *(f"{module}.{item.name}" for item in node.names)]
+            for name in names:
+                assert not set(name.split(".")) & forbidden, (source, name)
+
+
+def test_application_only_uses_domain_and_standard_library():
+    _assert_import_boundary(
+        ROOT / "src/psd_analyzer/application",
+        {
+            "plotly",
+            "streamlit",
+            "openpyxl",
+            "pandas",
+            "sqlalchemy",
+            "infrastructure",
+            "visualization",
+            "ui",
+            "numpy",
+            "scipy",
+        },
+    )
+
+
+def test_visualization_only_consumes_readonly_results():
+    _assert_import_boundary(
+        ROOT / "src/psd_analyzer/visualization",
+        {
+            "services",
+            "use_cases",
+            "infrastructure",
+            "openpyxl",
+            "pandas",
+            "sqlalchemy",
+            "streamlit",
+            "q_fitting",
+            "mixing",
+            "psd_mixing",
+            "policies",
+            "ui",
+        },
+    )
+
+
+def test_application_imports_without_presentation_and_io():
+    code = """
+import sys
+class BlockOuter:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {'plotly','streamlit','openpyxl','pandas','sqlalchemy'}:
+            raise AssertionError('Unexpected outer dependency: '+fullname)
+sys.meta_path.insert(0,BlockOuter())
+from psd_analyzer.application.use_cases import AnalyzeRecipePSD, ComparePSDAnalysis
+"""
+    subprocess.run([sys.executable, "-c", code], check=True, cwd=ROOT)
+
+
+def test_plot_builders_import_without_business_services():
+    code = """
+import sys
+class BlockBusiness:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.startswith(('psd_analyzer.domain.services',
+                                'psd_analyzer.application.use_cases',
+                                'psd_analyzer.infrastructure')):
+            raise AssertionError('Unexpected business dependency: '+fullname)
+sys.meta_path.insert(0,BlockBusiness())
+from psd_analyzer.visualization import build_psd_figure
+"""
+    subprocess.run([sys.executable, "-c", code], check=True, cwd=ROOT)
+
+
 def test_domain_has_no_outer_layer_imports():
     forbidden = {
         "streamlit",

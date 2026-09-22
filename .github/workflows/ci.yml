@@ -1,4 +1,4 @@
-name: PSD Core and Excel
+name: PSD Analyzer
 on:
   push:
   pull_request:
@@ -13,7 +13,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: python -m pip install -e ".[dev,excel]" -c requirements.lock
+      - run: python -m pip install -e ".[dev,excel,visualization]" -c requirements.lock
       - run: python -m ruff check src tests examples
       - run: python -m ruff format --check src tests examples
       - run: python -m mypy src
@@ -21,3 +21,4 @@ jobs:
       - run: python examples/domain_demo.py
       - run: python examples/psd_mixing_demo.py
       - run: python examples/excel_analysis_demo.py
+      - run: python examples/application_visualization_demo.py

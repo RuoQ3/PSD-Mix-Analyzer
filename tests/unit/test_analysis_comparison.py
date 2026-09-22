@@ -153,3 +153,10 @@ def test_mixed_measurement_protocols_require_explicit_confirmation(component, pr
         analyze_mixture((a, b), profile)
     result = analyze_mixture((a, b), replace(profile, measurement_compatibility_confirmed=True))
     assert any(d.code == "MEASUREMENT_COMPATIBILITY_ASSUMPTION" for d in result.diagnostics)
+
+
+def test_comparison_rejects_mismatched_key_size_results(component, profile):
+    baseline = analyze_mixture((component(),), profile)
+    current = replace(baseline, key_passing=baseline.key_passing[:-1])
+    with pytest.raises(IncompatibleComparisonError, match="Key-size grids"):
+        compare_results(current, baseline)
