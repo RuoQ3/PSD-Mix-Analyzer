@@ -6,9 +6,12 @@ from math import fsum, isfinite
 from .exceptions import DomainValidationError
 
 FRACTION_TOLERANCE = 1e-8
+CUMULATIVE_ROUNDOFF_TOLERANCE = 1e-12
 
 
 def finite(value: float, name: str) -> float:
+    if getattr(value, "ndim", 0) != 0:
+        raise DomainValidationError(f"{name} must contain scalar values, not nested arrays")
     if isinstance(value, bool):
         raise DomainValidationError(f"{name} must be a finite number, not bool")
     try:
@@ -33,7 +36,10 @@ def identifier(value: str, name: str) -> None:
 
 
 def vector(values: Iterable[float], name: str) -> tuple[float, ...]:
-    return tuple(finite(v, name) for v in values)
+    try:
+        return tuple(finite(v, name) for v in values)
+    except TypeError as exc:
+        raise DomainValidationError(f"{name} must be a one-dimensional numeric sequence") from exc
 
 
 def sizes(values: Iterable[float], *, minimum_count: int = 1) -> tuple[float, ...]:
@@ -49,7 +55,10 @@ def sizes(values: Iterable[float], *, minimum_count: int = 1) -> tuple[float, ..
 
 def fractions(values: Iterable[float]) -> tuple[tuple[float, ...], float]:
     raw = vector(values, "mass_fraction")
-    total = fsum(raw)
+    try:
+        total = fsum(raw)
+    except OverflowError as exc:
+        raise DomainValidationError("Mass fraction sum exceeds the numerical range") from exc
     if not raw or any(v < 0 for v in raw) or abs(total - 1.0) > FRACTION_TOLERANCE:
         raise DomainValidationError("Nonnegative mass fractions must sum to 1 (tolerance 1e-8)")
     return tuple(v / total for v in raw), total

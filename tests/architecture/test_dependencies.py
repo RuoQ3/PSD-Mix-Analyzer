@@ -49,3 +49,52 @@ from psd_analyzer.domain.services.comparison import compare_results
         cwd=ROOT,
         env={**__import__("os").environ, "PYTHONPATH": str(ROOT / "src")},
     )
+
+
+def test_metadata_free_mixing_service_has_no_business_or_fitting_imports():
+    source = ROOT / "src/psd_analyzer/domain/services/psd_mixing.py"
+    forbidden = {
+        "recipe",
+        "material",
+        "basis_conversion",
+        "mixing",
+        "analysis",
+        "q_fitting",
+        "packing_models",
+        "streamlit",
+        "plotly",
+        "pandas",
+        "sqlalchemy",
+        "openpyxl",
+    }
+    for node in ast.walk(ast.parse(source.read_text())):
+        if isinstance(node, ast.ImportFrom):
+            assert not set((node.module or "").split(".")) & forbidden
+        if isinstance(node, ast.Import):
+            for item in node.names:
+                assert not set(item.name.split(".")) & forbidden
+
+
+def test_mass_only_mix_runs_without_fitting_or_outer_modules():
+    code = """
+import sys
+class BlockUnneeded:
+    def find_spec(self, fullname, path=None, target=None):
+        outer = {'scipy','streamlit','plotly','pandas','sqlalchemy','openpyxl'}
+        if fullname.split('.')[0] in outer:
+            raise AssertionError('Unexpected dependency: '+fullname)
+        if fullname.split('.')[-1] in {'q_fitting','packing_models','basis_conversion','mixing'}:
+            raise AssertionError('Unexpected business or fitting dependency: '+fullname)
+sys.meta_path.insert(0,BlockUnneeded())
+from psd_analyzer.domain.models.psd import PSD
+from psd_analyzer.domain.services.psd_mixing import PSDMixingService
+from psd_analyzer.domain.services.interpolation import LinearInterpolator
+p=PSD((10,100),(0.2,0.8))
+assert PSDMixingService().mix((p,),(1,),LinearInterpolator()) == p
+"""
+    subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        cwd=ROOT,
+        env={**__import__("os").environ, "PYTHONPATH": str(ROOT / "src")},
+    )

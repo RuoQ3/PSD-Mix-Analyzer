@@ -90,7 +90,7 @@ class AnalysisResult:
     diagnostics: tuple[Diagnostic, ...]
     actual_weights: tuple[float, ...]
     input_fraction_sum: float
-    algorithm_version: str = "domain-core-0.1.0"
+    algorithm_version: str = "domain-core-0.1.1"
 
 
 @dataclass(frozen=True)

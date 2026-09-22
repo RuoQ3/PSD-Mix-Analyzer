@@ -8,6 +8,12 @@ from .models.analysis_result import EvaluatedCurve
 from .models.psd import PSD
 
 
+class PSDGridBuilder(Protocol):
+    """Build calculation nodes independently of interpolation and mixture metadata."""
+
+    def build(self, psds: Sequence[PSD]) -> tuple[float, ...]: ...
+
+
 class PSDInterpolator(Protocol):
     @property
     def method_id(self) -> str: ...

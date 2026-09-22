@@ -6,7 +6,7 @@
 
 ## 当前进度
 
-已完成项目目录框架与 **M2：Domain Core**。核心可以脱离 GUI、Excel 和数据库独立运行。Excel 导入、数据库、业务用例、Plotly 与 Streamlit 尚未实现；对应包仅预留边界，没有假页面或空业务实现。
+已完成项目目录框架、**M2：Domain Core** 和 **Task 3：PSD 插值与混合算法**。核心可以脱离 GUI、Excel 和数据库独立运行。Excel 导入、数据库、业务用例、Plotly 与 Streamlit 尚未实现；对应包仅预留边界，没有假页面或空业务实现。
 
 - 不可变的原料、批次、PSD 测量、配方版本、分析配置和结果。
 - 线性与对数粒径线性插值，严格的尾部覆盖处理。
@@ -19,6 +19,12 @@
 
 q 值仅反映整体颗粒级配趋势，不代表产品性能，也不能单独作为现场修改配方的依据。
 
+## Task 3：独立插值与质量混合
+
+新增 `PSDMixingService.mix(psds, mass_fractions, interpolator) -> PSD`：默认采用原始节点并集和 clamp 边界，仅接收 PSD 与质量比例。无需创建原料、批次或分析配置；不调用 q 拟合。
+
+已有 q 与级配模型来自 M2，本次未扩展这些功能。旧分析入口保留其固定评价网格和原边界规则。详见 [Task 3 模块说明](docs/psd_interpolation_mixing.md)。
+
 ## 安装与运行
 
 需要 Python 3.12+。建议先创建虚拟环境；Windows 激活路径为 `.venv\Scripts\activate`，Linux/macOS 为 `source .venv/bin/activate`。
@@ -26,6 +32,8 @@ q 值仅反映整体颗粒级配趋势，不代表产品性能，也不能单独
 ```bash
 python -m venv .venv
 python -m pip install -e ".[dev]" -c requirements.lock
+python examples/psd_mixing_demo.py
+# 原有完整分析示例仍可运行
 python examples/domain_demo.py
 ```
 
@@ -48,6 +56,7 @@ python -m mypy src
 
 | 入口 | 作用 |
 |---|---|
+| `PSDMixingService().mix(psds, mass_fractions, interpolator)` | 并集网格、默认 clamp、纯质量混合，返回 PSD |
 | `analyze_mixture(components, profile)` | 纯数值完整分析，不读写文件 |
 | `mix_psd(...)` | 在指定网格上插值、按一致统计基准混合 |
 | `fit_q(...)` | 固定模型边界下拟合单参数 q |
@@ -75,8 +84,8 @@ python -m mypy src
 ## 数值与数据约定
 
 - 内部单位：粒径 μm、通过率 0～1、密度 kg/m³，配方为干基质量分数。
-- 不自动排序、合并重复粒径、修复非单调数据或补全未知尾部；这些输入直接报错或返回覆盖缺失。
-- 只有显式确认的 0/1 端点可延续已知尾部；未知节点返回 `None`。
+- 原料 PSD 内部不自动排序、合并重复节点或修复非单调数据。跨原料节点并集由独立网格构建器去重排序。
+- Task 3 新服务默认 clamp，越界保持实际端点通过率。旧分析默认 CONFIRMED，仅延续明确确认的 0/1 尾部，其余返回 `None`；两者由同一边界策略控制。
 - 质量和体积统计基准不能混用；单原料质量/体积分布等同需要粒级密度一致假设。
 - 整体体积分数转换必须有与颗粒体积定义匹配的密度，不接受堆积密度。
 - 使用不同测试协议的数据需在分析配置中显式确认可比性，且结果保留诊断。
@@ -88,4 +97,4 @@ python -m mypy src
 
 ## 后续开发
 
-下一阶段为 **M3：Excel IO + Repository**，然后按用例、图表、界面顺序推进。不会提前增加 AI、自动配方优化、设备控制或性能预测。
+按当前任务安排，**Task 4：Modified Andreasen + q 拟合**可直接复用 Task 3 输出的 PSD，以及 M2 已有的模型/拟合接口；后续先检查已有实现再补齐需求。Excel IO、Repository、用例、图表和界面继续保留原架构边界，等待对应任务。

@@ -14,8 +14,12 @@ class InterpolationMethod(StrEnum):
 
 
 class TailPolicy(StrEnum):
+    """Explicit out-of-range behavior; STRICT retains missing coverage, ERROR raises."""
+
     STRICT = "strict"
     CONFIRMED = "confirmed"
+    CLAMP = "clamp"
+    ERROR = "error"
 
 
 @dataclass(frozen=True)

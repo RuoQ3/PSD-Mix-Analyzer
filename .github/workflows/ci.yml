@@ -19,3 +19,4 @@ jobs:
       - run: python -m mypy src
       - run: python -m pytest --cov=psd_analyzer.domain --cov-report=term-missing
       - run: python examples/domain_demo.py
+      - run: python examples/psd_mixing_demo.py

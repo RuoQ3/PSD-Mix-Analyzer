@@ -1,3 +1,3 @@
 """PSD Mix Analyzer. Importing the package has no I/O or UI side effects."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
