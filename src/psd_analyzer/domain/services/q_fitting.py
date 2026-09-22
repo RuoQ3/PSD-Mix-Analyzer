@@ -11,6 +11,9 @@ from ..models.analysis_result import FitResult, FitStatus
 from ..models.psd import PSD
 from ..protocols import LossFunction, QFittableModel
 from ..validation import finite, sizes, vector
+from .metrics import calculate_metrics
+
+MIN_FIT_POINTS = 3
 
 
 def fit_q(
@@ -21,7 +24,12 @@ def fit_q(
     model: QFittableModel,
     loss: LossFunction,
 ) -> FitResult:
-    grid = sizes(particle_size_um, minimum_count=3)
+    """Fit only inclusive in-range observations; never regrid or repair input PSDs.
+
+    Invalid input raises DomainValidationError. Numerical/model/loss failures are
+    represented by FitStatus.FAILED, keeping optimizer internals out of the API.
+    """
+    grid = sizes(particle_size_um)
     if len(grid) != len(cumulative_passing):
         raise DomainValidationError("Fitting vectors must have equal lengths")
     if model.model_id != profile.model_id or loss.loss_id != profile.loss_id:
@@ -31,10 +39,26 @@ def fit_q(
         a > b for a, b in zip(observed, observed[1:], strict=False)
     ):
         raise DomainValidationError("Fitting requires a valid cumulative PSD")
-    if grid[0] < profile.d_min_um or grid[-1] > profile.d_max_um:
-        raise DomainValidationError("Fit grid must lie inside the fixed model boundaries")
-    if any(v is None for v in cumulative_passing):
-        return FitResult(FitStatus.INSUFFICIENT_COVERAGE, message="Full fitting coverage required")
+    selected = tuple(
+        (d, p)
+        for d, p in zip(grid, cumulative_passing, strict=True)
+        if profile.d_min_um <= d <= profile.d_max_um
+    )
+    if len(selected) < MIN_FIT_POINTS:
+        raise DomainValidationError(
+            f"At least {MIN_FIT_POINTS} PSD points inside [Dmin, Dmax] are required for q fitting"
+        )
+    grid = tuple(d for d, _ in selected)
+    observed = vector((p for _, p in selected if p is not None), "passing")
+
+    if any(p is None for _, p in selected):
+        return FitResult(
+            FitStatus.INSUFFICIENT_COVERAGE,
+            message="Full in-range fitting coverage required",
+            point_count=len(observed),
+            d_min_um=profile.d_min_um,
+            d_max_um=profile.d_max_um,
+        )
     calls = 0
 
     def objective(q: float) -> float:
@@ -58,6 +82,9 @@ def fit_q(
                 FitStatus.WEAKLY_IDENTIFIED,
                 evaluations=calls,
                 message="Loss is effectively flat over the search interval",
+                point_count=len(observed),
+                d_min_um=profile.d_min_um,
+                d_max_um=profile.d_max_um,
             )
         candidates = [(values[0], float(probes[0])), (values[-1], float(probes[-1]))]
         intervals = [
@@ -74,7 +101,7 @@ def fit_q(
                 options={"xatol": profile.q_tolerance, "maxiter": 500},
             )
             if not result.success:
-                return FitResult(FitStatus.FAILED, evaluations=calls, message=str(result.message))
+                raise DomainValidationError(str(result.message))
             candidate_q = finite(result.x, "optimizer q")
             candidate_loss = finite(result.fun, "optimizer loss")
             if not lo <= candidate_q <= hi or candidate_loss < 0:
@@ -89,6 +116,29 @@ def fit_q(
             best_loss,
             calls,
             "Search boundary reached" if at_bound else "Converged after interval scan",
+            metrics=calculate_metrics(
+                observed,
+                PSD(
+                    grid,
+                    model.evaluate_q(
+                        grid,
+                        q=best_q,
+                        d_min_um=profile.d_min_um,
+                        d_max_um=profile.d_max_um,
+                    ),
+                    profile.mix_basis,
+                ).cumulative_passing,
+            ),
+            point_count=len(observed),
+            d_min_um=profile.d_min_um,
+            d_max_um=profile.d_max_um,
         )
-    except (DomainValidationError, ArithmeticError) as exc:
-        return FitResult(FitStatus.FAILED, evaluations=calls, message=str(exc))
+    except (ValueError, TypeError, ArithmeticError, RuntimeError) as exc:
+        return FitResult(
+            FitStatus.FAILED,
+            evaluations=calls,
+            message=str(exc),
+            point_count=len(observed),
+            d_min_um=profile.d_min_um,
+            d_max_um=profile.d_max_um,
+        )

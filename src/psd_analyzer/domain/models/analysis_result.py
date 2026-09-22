@@ -59,6 +59,11 @@ class ErrorMetrics:
     max_absolute_deviation: float
     n: int
 
+    @property
+    def mse(self) -> float:
+        """Mean squared residual in squared cumulative fraction units."""
+        return self.sse / self.n
+
 
 @dataclass(frozen=True)
 class FitResult:
@@ -67,6 +72,36 @@ class FitResult:
     objective_value: float | None = None
     evaluations: int = 0
     message: str = ""
+    metrics: ErrorMetrics | None = None
+    point_count: int = 0
+    d_min_um: float | None = None
+    d_max_um: float | None = None
+
+    @property
+    def q(self) -> float | None:
+        """Equivalent distribution modulus; absent when fitting did not identify q."""
+        return self.equivalent_q
+
+    @property
+    def converged(self) -> bool:
+        """Boundary solutions converged numerically but retain an explicit warning status."""
+        return self.status in (FitStatus.SUCCESS, FitStatus.AT_BOUND)
+
+    @property
+    def sse(self) -> float | None:
+        return None if self.metrics is None else self.metrics.sse
+
+    @property
+    def rmse(self) -> float | None:
+        return None if self.metrics is None else self.metrics.rmse
+
+    @property
+    def mae(self) -> float | None:
+        return None if self.metrics is None else self.metrics.mae
+
+    @property
+    def max_absolute_deviation(self) -> float | None:
+        return None if self.metrics is None else self.metrics.max_absolute_deviation
 
 
 @dataclass(frozen=True)
@@ -90,7 +125,7 @@ class AnalysisResult:
     diagnostics: tuple[Diagnostic, ...]
     actual_weights: tuple[float, ...]
     input_fraction_sum: float
-    algorithm_version: str = "domain-core-0.1.1"
+    algorithm_version: str = "domain-core-0.2.0"
 
 
 @dataclass(frozen=True)

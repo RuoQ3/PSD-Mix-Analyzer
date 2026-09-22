@@ -30,13 +30,13 @@ Modified Andreasen / Funk-Dinger 使用同一实现：
 
 `P(D) = (D**q - Dmin**q) / (Dmax**q - Dmin**q)`。
 
-模型区间外为 0/1。q→0 时为 `ln(D/Dmin)/ln(Dmax/Dmin)`。实现通过对数和非正指数的 expm1 形式避免相近幂相减与幂溢出；Dmin 必须大于 0。
+模型区间外为 0/1。Task 4 要求 q>0；极小正 q 的连续极限为 `ln(D/Dmin)/ln(Dmax/Dmin)`。实现通过对数和非正指数的 expm1 形式避免相近幂相减与幂溢出；Dmin 必须大于 0。
 
-默认损失为固定网格 SSE。q 范围默认 [0,1]，先扫描 101 点识别候选极小值区间，再进行有界标量最小化，并比较边界候选。可替换损失；扫描并不构成任意多峰损失的全局最优证明。
+默认损失为输入拟合节点的 SSE，仅使用 [Dmin,Dmax] 内至少三个节点。完整 analyze_mixture 沿用固定评价网格，直接对 Task 3 的 PSD 调用 fit_q 则保留并集节点。q 范围默认 [0.05,1]，先扫描 101 点识别候选极小值区间，再进行有界标量最小化，并比较边界候选。可替换损失；扫描并不构成任意多峰损失的全局最优证明。
 
 q_tolerance 默认 1e-8，边界诊断使用其 10 倍。扫描损失跨度 ≤1e-12 时默认标记 weakly_identified。均为可配置数值诊断，不是产品质量阈值。
 
-`target_q` 和 `equivalent_q` 独立。目标与最佳拟合的 RMSE、MAE、SSE、最大绝对偏差分别保存。拟合模型的能力通过 QFittableModel 声明，无 q 的自定义目标仍可生成目标曲线和误差，其拟合状态为 not_applicable。
+`target_q` 和 `equivalent_q` 独立。目标与最佳拟合的 RMSE、MAE、SSE、MSE、最大绝对偏差分别保存。FitResult 同时携带 metrics、实际点数、边界和 converged 状态；详情见 [Task 4](task4.md)。拟合模型的能力通过 QFittableModel 声明，无 q 的自定义目标仍可生成目标曲线和误差，其拟合状态为 not_applicable。
 
 状态：success、at_bound、weakly_identified、insufficient_coverage、failed、not_applicable。失败或辨识不足不以 q=0 替代。默认不生成统计置信区间，插值节点不是独立试验重复。
 

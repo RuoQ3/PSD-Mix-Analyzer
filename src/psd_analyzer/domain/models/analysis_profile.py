@@ -7,6 +7,8 @@ from ..exceptions import DomainValidationError
 from ..validation import finite, identifier, positive, sizes, vector
 from .psd import DistributionBasis
 
+DEFAULT_Q_BOUNDS = (0.05, 1.0)
+
 
 class InterpolationMethod(StrEnum):
     LINEAR = "linear"
@@ -34,7 +36,7 @@ class AnalysisProfile:
     tail_policy: TailPolicy = TailPolicy.CONFIRMED
     model_id: str = "modified-andreasen"
     loss_id: str = "sse"
-    q_bounds: tuple[float, float] = (0.0, 1.0)
+    q_bounds: tuple[float, float] = DEFAULT_Q_BOUNDS
     target_q: float | None = None
     key_sizes_um: tuple[float, ...] = (10.0, 45.0, 75.0, 100.0, 500.0, 1000.0)
     q_tolerance: float = 1e-8
@@ -71,6 +73,11 @@ class AnalysisProfile:
             raise DomainValidationError("q_tolerance must be smaller than the search interval")
         span = positive(self.weak_loss_span, "weak_loss_span")
         target = None if self.target_q is None else finite(self.target_q, "target_q")
+        if self.model_id == "modified-andreasen":
+            if bounds[0] <= 0 or (target is not None and target <= 0):
+                raise DomainValidationError(
+                    "Modified Andreasen requires positive q bounds and target q"
+                )
         object.__setattr__(self, "d_min_um", lo)
         object.__setattr__(self, "d_max_um", hi)
         object.__setattr__(self, "q_bounds", bounds)

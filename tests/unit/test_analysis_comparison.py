@@ -74,7 +74,7 @@ def test_successful_delta_q(component, profile):
         {"d_min_um": 0.5},
         {"grid_points": 21},
         {"interpolation": InterpolationMethod.LINEAR},
-        {"q_bounds": (0, 2)},
+        {"q_bounds": (0.05, 2)},
     ],
 )
 def test_comparison_requires_same_profile(component, profile, change):
@@ -104,7 +104,7 @@ def test_incomplete_comparison_blocked_and_bound_delta_unavailable(component, pr
     a = analyze_mixture((component(grid=(10, 100), passing=(0.2, 0.9)),), profile)
     with pytest.raises(IncompatibleComparisonError):
         compare_results(a, a)
-    b = analyze_mixture((generated(component, profile, 0),), profile)
+    b = analyze_mixture((generated(component, profile, profile.q_bounds[0]),), profile)
     difference = compare_results(b, b)
     assert difference.delta_q is None
     assert difference.diagnostics[0].code == "DELTA_Q_UNAVAILABLE"

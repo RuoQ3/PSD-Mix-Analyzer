@@ -6,14 +6,14 @@
 
 ## 当前进度
 
-已完成项目目录框架、**M2：Domain Core** 和 **Task 3：PSD 插值与混合算法**。核心可以脱离 GUI、Excel 和数据库独立运行。Excel 导入、数据库、业务用例、Plotly 与 Streamlit 尚未实现；对应包仅预留边界，没有假页面或空业务实现。
+已完成项目目录框架、**M2：Domain Core**、**Task 3：PSD 插值与混合**、**Task 4：Modified Andreasen + q 拟合**及 **Task 5：Excel 数据输入层**。数学核心可以脱离 GUI、Excel 和数据库独立运行。数据库、Application 业务用例、Plotly 与 Streamlit 仍只预留边界。
 
 - 不可变的原料、批次、PSD 测量、配方版本、分析配置和结果。
 - 线性与对数粒径线性插值，严格的尾部覆盖处理。
 - 质量混合、密度换算及带明确假设的体积基准分析。
-- Modified Andreasen / Funk-Dinger 模型，包含 q→0 稳定极限。
+- Modified Andreasen / Funk-Dinger 模型，要求 q > 0，保留 q→0⁺ 的稳定数值处理。
 - 用户目标 q 与拟合等效 q 分开保存；损失函数与模型可替换。
-- RMSE、MAE、SSE、最大绝对偏差、可配置关键粒径和基准差异。
+- MSE、RMSE、MAE、SSE、最大绝对偏差、可配置关键粒径和基准差异。
 - 正式配方锁定、固定比例替代校验、独立研发配方副本。
 - 原始输入快照、实际权重、配置和算法版本随计算结果返回，供下一阶段持久化。
 
@@ -23,7 +23,15 @@ q 值仅反映整体颗粒级配趋势，不代表产品性能，也不能单独
 
 新增 `PSDMixingService.mix(psds, mass_fractions, interpolator) -> PSD`：默认采用原始节点并集和 clamp 边界，仅接收 PSD 与质量比例。无需创建原料、批次或分析配置；不调用 q 拟合。
 
-已有 q 与级配模型来自 M2，本次未扩展这些功能。旧分析入口保留其固定评价网格和原边界规则。详见 [Task 3 模块说明](docs/psd_interpolation_mixing.md)。
+旧分析入口保留其固定评价网格和原边界规则。详见 [Task 3 模块说明](docs/psd_interpolation_mixing.md)。
+
+## Task 4 与 Task 5
+
+沿用既有 `ModifiedAndreasen`、`fit_q`、`FitResult`、`PackingModel` 和 `LossFunction`。拟合仅使用模型范围内至少 3 个节点，默认 q 搜索范围为 `[0.05, 1.0]`；结果携带独立 SSE/MSE/RMSE/MAE/MaxDev、有效点数、模型边界和收敛状态。`evaluate_at_sizes` 直接复用 Task 3 插值策略。
+
+Excel 采用既有架构的 `Materials`、`Measurements`、`PSD`、`Recipe` 数据表，保留批次与测量标识；模板另含 `说明` 页。导入先收集结构化错误，再构造已有领域对象；不会运行混合、拟合或选择批次。配方导入为 Draft，不具备生产发布功能。
+
+详见 [Task 4 数学服务](docs/task4.md) 与 [Excel 格式及接口](docs/excel_input.md)。
 
 ## 安装与运行
 
@@ -31,13 +39,15 @@ q 值仅反映整体颗粒级配趋势，不代表产品性能，也不能单独
 
 ```bash
 python -m venv .venv
-python -m pip install -e ".[dev]" -c requirements.lock
+python -m pip install -e ".[dev,excel]" -c requirements.lock
 python examples/psd_mixing_demo.py
 # 原有完整分析示例仍可运行
 python examples/domain_demo.py
+# Excel 导入 → 固定配方混合 → q 拟合
+python examples/excel_analysis_demo.py
 ```
 
-`pyproject.toml` 定义依赖；`requirements.lock` 是本次 Python 3.12 验证环境的完整开发依赖约束。跨 Python 大版本升级时重新验证并更新锁定版本。仅运行核心时可安装 `python -m pip install -e . -c requirements.lock`。
+`pyproject.toml` 定义依赖；`requirements.lock` 是本次 Python 3.12 验证环境的完整开发依赖约束。跨 Python 大版本升级时重新验证并更新锁定版本。Excel 是可选依赖，通过 `.[excel]` 安装；使用 openpyxl 保留原始单元格格式和位置，不额外依赖 pandas。仅运行核心时可安装 `python -m pip install -e . -c requirements.lock`。
 
 示例使用人工构造数据，展示固定配方的基准、原料替代及质量/体积权重差异，不包含真实生产配方。输出到终端，不操作数据库或设备。
 
@@ -52,6 +62,8 @@ python -m mypy src
 
 覆盖率门槛为 90%，包含分支覆盖。CI 在 Python 3.12 下执行相同检查。数值恢复测试使用合成数据，混合和插值另有独立手算案例；不将测试通过解释为生产数据已经验证。
 
+Task 4 / Task 5 本地验收：Python 3.12，264 项测试通过，Domain 行与分支综合覆盖率 98.25%；Ruff、mypy（44 个源文件）和三个示例通过。Excel 示例恢复 q=0.2499999977（预期 0.25）。
+
 ## 核心入口
 
 | 入口 | 作用 |
@@ -59,7 +71,11 @@ python -m mypy src
 | `PSDMixingService().mix(psds, mass_fractions, interpolator)` | 并集网格、默认 clamp、纯质量混合，返回 PSD |
 | `analyze_mixture(components, profile)` | 纯数值完整分析，不读写文件 |
 | `mix_psd(...)` | 在指定网格上插值、按一致统计基准混合 |
-| `fit_q(...)` | 固定模型边界下拟合单参数 q |
+| `fit_q(...)` | 筛选模型范围内节点，返回 q、状态和指标 |
+| `evaluate_at_sizes(psd, sizes, interpolator)` | 可配置粒径查询，复用插值策略 |
+| `calculate_metrics(observed, predicted)` | 唯一的误差指标计算来源 |
+| `import_excel_workbook(path)` | 读取和校验，返回不可变领域对象集合 |
+| `generate_excel_template(path)` | 生成带明确示例标记的标准模板 |
 | `compare_results(current, baseline)` | 比较同一口径结果，输出差值 |
 | `validate_selection(recipe, components)` | 检查正式配方、组分身份与比例 |
 | `validate_selection(..., substitution=True)` | 保持比例，允许明确替代原料 |
@@ -73,11 +89,11 @@ python -m mypy src
 |---|---|
 | `src/psd_analyzer/domain` | 已实现：数据不变量、业务约束与数学计算 |
 | `src/psd_analyzer/application` | 预留：用例、传输对象、Repository 接口 |
-| `src/psd_analyzer/infrastructure` | 预留：Excel、数据库、配置 |
+| `src/psd_analyzer/infrastructure` | 已实现 Excel；数据库、配置仍预留 |
 | `src/psd_analyzer/visualization` | 预留：独立图表 |
 | `src/psd_analyzer/ui` | 预留：Streamlit 页面 |
 | `tests/unit`、`tests/architecture` | 数学、数据、配方与依赖边界测试 |
-| `tests/integration`、`tests/fixtures` | 预留后续文件与数据库集成案例 |
+| `tests/integration` | Excel → 混合 → q 拟合 → 指标的手算案例 |
 | `examples` | 可运行的独立核心示例 |
 | `docs` | 架构、数学口径、M2 交付说明 |
 
@@ -89,12 +105,18 @@ python -m mypy src
 - 质量和体积统计基准不能混用；单原料质量/体积分布等同需要粒级密度一致假设。
 - 整体体积分数转换必须有与颗粒体积定义匹配的密度，不接受堆积密度。
 - 使用不同测试协议的数据需在分析配置中显式确认可比性，且结果保留诊断。
-- q 默认搜索范围 [0,1] 是数值配置，不是质量标准；命中边界、覆盖不足、目标函数过平坦与失败均有独立状态。
+- q 默认搜索范围 [0.05,1] 是数值配置，不是质量标准；命中边界、覆盖不足、目标函数过平坦与失败均有独立状态。
 - 拟合网格与关键粒径分开；更换分析配置不得直接与历史 q 混合比较。
 - SSE 为分数平方和；RMSE 等显示为百分点时乘 100，SSE 改成 pp² 时乘 10000。
 
 详见 [数学与接口约定](docs/mathematical_conventions.md)、[第一阶段架构](docs/architecture.md) 和 [M2 交付说明](docs/domain_core.md)。
 
+## 本次兼容性调整
+
+- 本任务要求 `q > 0`，因此原有 `q = 0`、负 q 和 Modified Andreasen 的非正搜索下界现在报错；近零正 q 仍稳定计算。使用旧 `[0,1]` 配置时需显式更新配置版本及下界。
+- `MaterialBatch.supplier` 允许空字符串表示尚未填写，批次身份和 `batch_no` 仍必须明确。不会填造供应商名称；空 notes 沿用现有领域模型的空字符串约定。
+- Task 3 的质量混合、PSD、Recipe 以及插值协议保持原接口。算法版本更新为 `domain-core-0.2.0`，旧分析结果应按同一配置重算后比较。
+
 ## 后续开发
 
-按当前任务安排，**Task 4：Modified Andreasen + q 拟合**可直接复用 Task 3 输出的 PSD，以及 M2 已有的模型/拟合接口；后续先检查已有实现再补齐需求。Excel IO、Repository、用例、图表和界面继续保留原架构边界，等待对应任务。
+后续 Application 可以直接组合 Excel 导入返回的领域对象、`PSDMixingService`、`fit_q`、`ModifiedAndreasen`、`calculate_metrics` 和 `evaluate_at_sizes`。本阶段不新增大型用例编排，不涉及数据库、UI、自动优化或生产配方自动修改。

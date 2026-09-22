@@ -108,11 +108,11 @@ def test_invalid_profile(profile, kwargs):
 
 def test_profile_defensive_copy():
     keys = [1, 10]
-    bounds = [0, 1]
+    bounds = [0.05, 1]
     p = AnalysisProfile("a", "1", 1, 100, key_sizes_um=keys, q_bounds=bounds)
     keys.append(100)
     bounds[1] = 9
-    assert p.key_sizes_um == (1, 10) and p.q_bounds == (0, 1)
+    assert p.key_sizes_um == (1, 10) and p.q_bounds == (0.05, 1)
 
 
 def test_material_and_density_validation():
@@ -125,6 +125,12 @@ def test_material_and_density_validation():
         MaterialBatch("b", "m", "s", "1", 0, DensityKind.TRUE)
     with pytest.raises(DomainValidationError):
         MaterialBatch("b", "m", "s", "1", 2500, "true")
+
+
+def test_unknown_supplier_is_optional_metadata():
+    assert MaterialBatch("b", "m", "", "lot-1").supplier == ""
+    with pytest.raises(DomainValidationError, match="supplier"):
+        MaterialBatch("b", "m", None, "lot-1")
 
 
 def test_measurement_and_component_validation(component):

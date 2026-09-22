@@ -32,6 +32,33 @@ def test_domain_has_no_outer_layer_imports():
                 assert not set(name.split(".")) & forbidden, (source, name)
 
 
+def test_excel_has_no_numerical_service_dependencies():
+    forbidden = {
+        "scipy",
+        "packing_models",
+        "q_fitting",
+        "metrics",
+        "analysis",
+        "psd_mixing",
+        "mixing",
+        "interpolation",
+        "streamlit",
+        "plotly",
+        "sqlalchemy",
+    }
+    for source in (ROOT / "src/psd_analyzer/infrastructure/excel").rglob("*.py"):
+        for node in ast.walk(ast.parse(source.read_text())):
+            names = []
+            if isinstance(node, ast.Import):
+                names = [item.name for item in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module or ""]
+                if (node.module or "").endswith("domain"):
+                    names += [item.name for item in node.names]
+            for name in names:
+                assert not set(name.split(".")) & (forbidden | {"services"}), (source, name)
+
+
 def test_core_imports_without_ui_or_database_packages():
     code = """
 import sys

@@ -14,7 +14,7 @@ from psd_analyzer.domain.services.packing_models import ModifiedAndreasen
 from psd_analyzer.domain.services.q_fitting import fit_q
 
 
-@pytest.mark.parametrize("q", [-100, -0.5, 0, 1e-12, 0.3, 1, 100])
+@pytest.mark.parametrize("q", [1e-12, 0.25, 0.3, 1, 100])
 def test_model_endpoints_monotonicity_and_finiteness(q):
     grid = (0.1, 1, 2, 10, 50, 100, 1000)
     actual = ModifiedAndreasen().evaluate_q(grid, q=q, d_min_um=1, d_max_um=100)
@@ -29,7 +29,7 @@ def test_model_against_independent_values():
     assert model.evaluate_q((1, 10, 100), q=1, d_min_um=1, d_max_um=100) == pytest.approx(
         (0, 9 / 99, 1)
     )
-    assert model.evaluate_q((1, 10, 100), q=0, d_min_um=1, d_max_um=100) == pytest.approx(
+    assert model.evaluate_q((1, 10, 100), q=1e-12, d_min_um=1, d_max_um=100) == pytest.approx(
         (0, 0.5, 1)
     )
     assert model.evaluate_q((1, 10, 100), q=0.5, d_min_um=1, d_max_um=100)[1] == pytest.approx(
@@ -43,7 +43,7 @@ def test_model_against_independent_values():
         model.evaluate_q((1, 2), q=1e308, d_min_um=1, d_max_um=1e308)
 
 
-@pytest.mark.parametrize("q", [0.03, 0.1, 0.25, 0.37, 0.5, 0.8, 0.97])
+@pytest.mark.parametrize("q", [0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.8, 0.97])
 def test_recover_known_q(profile, q):
     model = ModifiedAndreasen()
     grid = build_grid(profile)
@@ -54,7 +54,7 @@ def test_recover_known_q(profile, q):
     assert result.objective_value < 1e-12
 
 
-@pytest.mark.parametrize("q", [0, 1])
+@pytest.mark.parametrize("q", [0.05, 1])
 def test_boundary_fit_preserves_warning(profile, q):
     model = ModifiedAndreasen()
     grid = build_grid(profile)
@@ -149,6 +149,7 @@ def test_wrong_strategy_identity(profile):
 def test_hand_calculated_metrics():
     m = calculate_metrics((0, 0.5, 1), (0, 0.4, 0.8))
     assert m.sse == pytest.approx(0.05)
+    assert m.mse == pytest.approx(0.05 / 3)
     assert m.rmse == pytest.approx(sqrt(0.05 / 3))
     assert m.mae == pytest.approx(0.1)
     assert m.max_absolute_deviation == pytest.approx(0.2)

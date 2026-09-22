@@ -27,6 +27,8 @@ class Material:
 
 @dataclass(frozen=True)
 class MaterialBatch:
+    """A batch identity; an empty supplier denotes metadata not supplied."""
+
     batch_id: str
     material_id: str
     supplier: str
@@ -35,8 +37,10 @@ class MaterialBatch:
     density_kind: DensityKind | None = None
 
     def __post_init__(self) -> None:
-        for name in ("batch_id", "material_id", "supplier", "batch_no"):
+        for name in ("batch_id", "material_id", "batch_no"):
             identifier(getattr(self, name), name)
+        if not isinstance(self.supplier, str):
+            raise DomainValidationError("supplier must be a string; use empty text if unknown")
         if (self.density_kg_m3 is None) != (self.density_kind is None):
             raise DomainValidationError("Density value and kind must be supplied together")
         if self.density_kg_m3 is not None:

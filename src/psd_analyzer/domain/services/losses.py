@@ -2,9 +2,8 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from math import fsum
 
-from .metrics import residuals
+from .metrics import calculate_metrics
 
 
 @dataclass(frozen=True)
@@ -12,4 +11,4 @@ class SquaredErrorLoss:
     loss_id: str = "sse"
 
     def __call__(self, observed: Sequence[float], predicted: Sequence[float]) -> float:
-        return fsum(e * e for e in residuals(observed, predicted))
+        return calculate_metrics(observed, predicted).sse
