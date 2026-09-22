@@ -2,6 +2,7 @@
 
 from .difference_plot import build_psd_difference_figure
 from .exceptions import VisualizationError
+from .history_plot import build_q_trend_figure
 from .key_size_plot import build_key_size_comparison_figure
 from .models import KeySizeSeries, PSDSeries, QSeries
 from .psd_plot import build_psd_figure
@@ -16,4 +17,5 @@ __all__ = [
     "build_psd_difference_figure",
     "build_psd_figure",
     "build_q_comparison_figure",
+    "build_q_trend_figure",
 ]

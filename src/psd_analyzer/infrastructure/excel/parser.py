@@ -172,7 +172,20 @@ class SheetParser:
         line = self.text(row, "line_key")
         material = self.text(row, "material_code")
         fraction = self.number(row, "mass_fraction_pct", percent=True)
+        status = self.text(row, "status", optional=True) or "draft"
+        approval = self.text(row, "approval_reference", optional=True) or ""
+        if status not in ("draft", "released", "archived"):
+            self.issue(row, "status", "invalid_recipe_status", "Use draft, released or archived")
+        if status in ("released", "archived") and not approval:
+            self.issue(
+                row,
+                "approval_reference",
+                "approval_required",
+                "Released/archived recipes require an external approval reference",
+            )
         if len(self.issues) == count:
             assert recipe and name and version and line and material and fraction is not None
-            return RecipeImportRecord(row, recipe, name, version, line, material, fraction)
+            return RecipeImportRecord(
+                row, recipe, name, version, line, material, fraction, status, approval
+            )
         return None

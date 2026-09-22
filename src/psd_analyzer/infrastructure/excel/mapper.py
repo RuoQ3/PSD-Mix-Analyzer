@@ -6,7 +6,7 @@ from math import fsum
 from ...domain.exceptions import DomainValidationError
 from ...domain.models.material import DensityKind, Material, MaterialBatch
 from ...domain.models.psd import PSD, DistributionBasis, PSDMeasurement
-from ...domain.models.recipe import RecipeLine, RecipeVersion
+from ...domain.models.recipe import RecipeLine, RecipeStatus, RecipeVersion
 from ...domain.validation import FRACTION_TOLERANCE
 from .parser import SheetParser
 from .records import (
@@ -164,6 +164,14 @@ class DomainMapper:
                         line.source, "line_key", "duplicate_recipe_line", "Line key must be unique"
                     )
                 seen_lines.add(line.line_key)
+                for column in ("status", "approval_reference"):
+                    if getattr(line, column) != getattr(lines[0], column):
+                        issue(
+                            line.source,
+                            column,
+                            "conflicting_recipe_metadata",
+                            "Rows for a recipe version must agree on status and approval",
+                        )
                 if line.recipe_name != lines[0].recipe_name:
                     issue(
                         line.source,
@@ -272,6 +280,8 @@ class DomainMapper:
                             )
                             for line in lines
                         ),
+                        status=RecipeStatus(lines[0].status),
+                        approval_reference=lines[0].approval_reference,
                     )
                 )
             except DomainValidationError as exc:

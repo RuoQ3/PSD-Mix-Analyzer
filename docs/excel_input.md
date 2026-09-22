@@ -36,7 +36,7 @@ except ExcelImportError as exc:
 | Materials | material_code, material_name, batch_key, batch_no | supplier, grade, notes, density, density_kind |
 | Measurements | measurement_key, batch_key, basis, method, protocol | version |
 | PSD | measurement_key, particle_size_um, cumulative_passing_pct | — |
-| Recipe | recipe_code, recipe_version, line_key, material_code, mass_fraction_pct | recipe_name |
+| Recipe | recipe_code, recipe_version, line_key, material_code, mass_fraction_pct | recipe_name, status, approval_reference |
 
 第一行填写列名；列名和 Sheet 名区分大小写。标识和版本用文本填写，例如 `A001`、`v1`、文本 `1`，避免 Excel 丢失前导零。未知附加列不参与当前领域映射。当前领域对象没有 `tested_at` 字段，本版不导入测试日期。
 
@@ -70,10 +70,12 @@ except ExcelImportError as exc:
 |---|---|
 | reader.py | openpyxl 读取原值和格式、文件 SHA-256、Sheet 与列校验 |
 | parser.py | 文本／数值解析、单位识别、逐行 DTO |
-| records.py | 不可变导入记录、ImportedWorkbook、ImportIssue、ExcelImportError |
+| records.py | Excel 原始逐行记录；兼容再导出 Application 的 ImportedWorkbook、ImportIssue、ExcelImportError |
 | mapper.py | 关联、顺序、单调性及总比例校验；再调用领域构造器 |
 | importer.py | 编排 reader → schema → parser → mapper |
 | template.py | 创建标准输入模板与虚构示例 |
+
+公共导入结果与结构化错误的唯一实现位于 `application/dto/workbook.py`，旧 `infrastructure.excel.records` 导入路径兼容保留；原始单元格 DTO 仍只属于 Infrastructure。`WorkbookGateway` 让 UI 经 Application 上传 bytes 或下载模板，不直接调用 Excel 库。
 
 `ExcelImporter` 可注入 reader 和 schema validator。未来 CSV/API 输入适配器可构造相同领域对象，无需改数学服务；Excel DTO 不进入 Domain。
 
@@ -85,6 +87,6 @@ except ExcelImportError as exc:
 
 `ImportedWorkbook` 包含 `materials`、`batches`、`measurements`、`recipes` 元组及 `source_hash`。每个 PSDMeasurement 保留原文件哈希，便于后续追溯；当前不保存原文件副本或实现导入历史。
 
-所有导入配方均为 Draft，不提供生产发布或覆盖正式配方的入口。调用方根据配方行显式选择批次和测量，再把对应 PSD 和质量比例交给 `PSDMixingService`；对返回 PSD 调用 `fit_q`。完整示例见 `examples/excel_analysis_demo.py`。
+配方默认 Draft。Task 8 增加可选 `status`（draft / released / archived）和 `approval_reference`；Released / Archived 必须填写外部审批引用，同一配方版本各行必须一致。导入只保留已声明状态，不提供生产审批、发布或覆盖正式配方的入口。调用方根据配方行显式选择批次和测量，再把对应 PSD 和质量比例交给 `PSDMixingService`；对返回 PSD 调用 `fit_q`。完整示例见 `examples/excel_analysis_demo.py`。
 
 集成测试使用粒径 `1,16,81,256,625` 与通过率 `0,25,50,75,100%` 的小文件。四次方根为 `1,2,3,4,5`，可手算验证 q=0.25，测试调用正式导入、混合、拟合和指标接口，不复制算法。

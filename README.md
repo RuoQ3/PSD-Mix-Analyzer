@@ -6,7 +6,7 @@
 
 ## 当前进度
 
-已完成项目目录框架、**M2：Domain Core**、**Task 3：PSD 插值与混合**、**Task 4：Modified Andreasen + q 拟合**、**Task 5：Excel 数据输入层**、**Task 6：Application 用例**及 **Task 7：Plotly 可视化**。数学核心可以脱离 GUI、Excel 和数据库独立运行。数据库与 Streamlit 仍只预留边界。
+已完成项目目录框架、**M2：Domain Core**、**Task 3：PSD 插值与混合**、**Task 4：Modified Andreasen + q 拟合**、**Task 5：Excel 数据输入层**、**Task 6：Application 用例**、**Task 7：Plotly 可视化**、**Task 8：Streamlit 界面**及 **Task 9：SQLite 历史分析**。数学核心可以脱离 GUI、Excel 和数据库独立运行。界面、数据库和绘图通过已有应用接口组合。
 
 - 不可变的原料、批次、PSD 测量、配方版本、分析配置和结果。
 - 线性与对数粒径线性插值，严格的尾部覆盖处理。
@@ -15,7 +15,7 @@
 - 用户目标 q 与拟合等效 q 分开保存；损失函数与模型可替换。
 - MSE、RMSE、MAE、SSE、最大绝对偏差、可配置关键粒径和基准差异。
 - 正式配方锁定、固定比例替代校验、独立研发配方副本。
-- 原始输入快照、实际权重、配置和算法版本随计算结果返回，供下一阶段持久化。
+- 原始输入快照、实际权重、配置和算法版本随计算结果返回，可显式保存为历史快照。
 
 q 值仅反映整体颗粒级配趋势，不代表产品性能，也不能单独作为现场修改配方的依据。
 
@@ -29,7 +29,7 @@ q 值仅反映整体颗粒级配趋势，不代表产品性能，也不能单独
 
 沿用既有 `ModifiedAndreasen`、`fit_q`、`FitResult`、`PackingModel` 和 `LossFunction`。拟合仅使用模型范围内至少 3 个节点，默认 q 搜索范围为 `[0.05, 1.0]`；结果携带独立 SSE/MSE/RMSE/MAE/MaxDev、有效点数、模型边界和收敛状态。`evaluate_at_sizes` 直接复用 Task 3 插值策略。
 
-Excel 采用既有架构的 `Materials`、`Measurements`、`PSD`、`Recipe` 数据表，保留批次与测量标识；模板另含 `说明` 页。导入先收集结构化错误，再构造已有领域对象；不会运行混合、拟合或选择批次。配方导入为 Draft，不具备生产发布功能。
+Excel 采用既有架构的 `Materials`、`Measurements`、`PSD`、`Recipe` 数据表，保留批次与测量标识；模板另含 `说明` 页。导入先收集结构化错误，再构造已有领域对象；不会运行混合、拟合或选择批次。配方缺省导入为 Draft；可选 status / approval_reference 可读取外部已批准配方，不具备生产发布功能。
 
 详见 [Task 4 数学服务](docs/task4.md) 与 [Excel 格式及接口](docs/excel_input.md)。
 
@@ -41,6 +41,22 @@ Excel 采用既有架构的 `Materials`、`Measurements`、`PSD`、`Recipe` 数�
 
 详见 [Application 用例](docs/application.md) 和 [Plotly 可视化](docs/visualization.md)。
 
+## Task 8 与 Task 9
+
+Streamlit 提供生产监控、固定比例替代分析、研发模拟和历史查询。只有模拟页面可编辑比例；保存分析与设置基准均需显式点击。SQLite 保存结果、源 PSD、批次、配方版本及数值配置；恢复后调用现有 Figure 构建器绘图。
+
+```bash
+python -m pip install -e ".[dev,ui]" -c requirements.lock
+python -m streamlit run src/psd_analyzer/ui/streamlit_app/app.py
+```
+
+Windows 已激活虚拟环境时可使用相同命令；未激活时用 `.\.venv\Scripts\python.exe` 替换 `python`。
+默认数据库为启动目录下 `data/psd_analyzer.db`，可通过 `PSD_ANALYZER_DB` 指定其他路径。首次组装应用时集中初始化表结构。
+
+下载示例模板后可直接进入研发模拟。生产与替代分析要求 Excel Recipe 表中每行填写 `status=released` 及真实外部 `approval_reference`；界面没有配方审批或发布功能。默认采用实测节点并集和 clamp 尾部延伸。
+
+历史比较要求相同配方版本、计算配置、算法版本和粒径网格；不兼容时报告原因，不静默重算。历史数据是分析记录，不是正式产品质量判定数据库。详见 [界面使用](docs/streamlit.md) 与 [持久化](docs/persistence.md)。
+
 ## 安装与运行
 
 需要 Python 3.12+。建议先创建虚拟环境；Windows 激活路径为 `.venv\Scripts\activate`，Linux/macOS 为 `source .venv/bin/activate`。
@@ -48,7 +64,7 @@ Excel 采用既有架构的 `Materials`、`Measurements`、`PSD`、`Recipe` 数�
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Linux/macOS；Windows 使用下方命令
-python -m pip install -e ".[dev,excel,visualization]" -c requirements.lock
+python -m pip install -e ".[dev,excel,visualization,persistence,ui]" -c requirements.lock
 python examples/psd_mixing_demo.py
 # 原有完整分析示例仍可运行
 python examples/domain_demo.py
@@ -62,7 +78,7 @@ Windows PowerShell 可直接指定虚拟环境解释器，避免误用系统中�
 
 ```powershell
 py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev,excel,visualization]" -c requirements.lock
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,excel,visualization,persistence,ui]" -c requirements.lock
 .\.venv\Scripts\python.exe examples/application_visualization_demo.py --output-dir data/demo_figures
 ```
 
@@ -84,6 +100,8 @@ python -m mypy src
 Task 4 / Task 5 本地验收：Python 3.12，264 项测试通过，Domain 行与分支综合覆盖率 98.25%；Ruff、mypy（44 个源文件）和三个示例通过。Excel 示例恢复 q=0.2499999977（预期 0.25）。
 
 Task 6 / Task 7 本地验收：312 项测试通过，Domain 行与分支综合覆盖率 98.30%；Ruff、mypy（58 个源文件）和四个示例通过。测试包括 Application → Figure、批次比较 → 多图以及 Excel Draft → 研发模拟 → Figure。
+
+Task 8 / Task 9 本地验收：375 项测试通过，Domain 行与分支综合覆盖率 98.30%；Ruff、mypy（86 个源文件）和四个原有示例通过。包含 13 项 Streamlit 交互测试、17 项持久化测试、Excel → Application → SQLite → Figure 集成及无界面启动健康检查。
 
 ## 核心入口
 
@@ -109,10 +127,10 @@ Task 6 / Task 7 本地验收：312 项测试通过，Domain 行与分支综合�
 | 目录 | 职责/状态 |
 |---|---|
 | `src/psd_analyzer/domain` | 已实现：数据不变量、业务约束与数学计算 |
-| `src/psd_analyzer/application` | 已实现四类用例和计算依赖注入；Repository 仍预留 |
-| `src/psd_analyzer/infrastructure` | 已实现 Excel；数据库、配置仍预留 |
+| `src/psd_analyzer/application` | 已实现四类用例和计算依赖注入；Repository 协议及历史查询用例 |
+| `src/psd_analyzer/infrastructure` | 已实现 Excel 和 SQLAlchemy / SQLite 快照持久化 |
 | `src/psd_analyzer/visualization` | 已实现独立 Plotly Figure 构建器与绘图数据 |
-| `src/psd_analyzer/ui` | 预留：Streamlit 页面 |
+| `src/psd_analyzer/ui` | 已实现：生产、替代、模拟、历史四类页面 |
 | `tests/unit`、`tests/architecture` | 数学、数据、配方与依赖边界测试 |
 | `tests/integration` | Excel → 数学；Application → Figure；比较结果 → 三类图 |
 | `examples` | 可运行的独立核心示例 |
@@ -140,4 +158,4 @@ Task 6 / Task 7 本地验收：312 项测试通过，Domain 行与分支综合�
 
 ## 后续开发
 
-未来 UI 可直接调用 Application 用例，再将结果交给 Figure 构建器；本阶段不实现 Streamlit 页面、数据库、SPC、自动优化或生产配方自动修改。
+当前已提供完整界面与历史记录；后续可扩展正式控制标准。本阶段不实现 SPC、自动优化或生产配方自动修改。

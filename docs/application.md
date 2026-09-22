@@ -83,3 +83,17 @@ AnalyzeRecipePSD 构造器可注入 grid_builder、interpolator、model、loss�
 代码位于既有 `application/use_cases` 和 `application/ports`。Plotly 属于独立可选依赖；Application 不导入 Plotly、Streamlit、Excel、数据库、NumPy 或 SciPy 的计算接口。
 
 完整示例：`python examples/application_visualization_demo.py`。加 `--output-dir data/demo_figures` 可导出独立交互 HTML；绘图由调用方执行，不在 use case 内执行。
+
+## Task 8 / Task 9 的调用边界
+
+`WorkbookAnalysis` 将已导入工作簿、配方、逐行 PSD 选择和配置传入上述既有用例。
+`ImportWorkbook` / `GenerateWorkbookTemplate` 依赖 `WorkbookGateway` Protocol，
+页面无需导入 Excel infrastructure。默认 UI profile 显式采用 clamp，不改动 Task 6 的默认约定。
+
+`SaveAnalysis`、`ListAnalysisHistory`、`GetAnalysisDetail`、`GetBaselineAnalysis`、
+`SetBaselineAnalysis`、`CompareHistoricalAnalyses` 只依赖 Application 的
+`AnalysisRepository` Protocol。数据库实现由 composition root 注入。保存是独立操作，
+数学用例不会自动写入数据库；历史比较调用现有 `compare_results`，不静默改变网格或重拟合。
+
+`ApplicationContainer` 是这些用例的显式不可变组合，只有组装层知道 SQLite 和 Excel 的实现。
+公共导入 DTO 使用唯一实现，旧 infrastructure 导入路径保持兼容。

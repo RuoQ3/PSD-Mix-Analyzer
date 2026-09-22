@@ -204,3 +204,30 @@ assert PSDMixingService().mix((p,),(1,),LinearInterpolator()) == p
         cwd=ROOT,
         env={**__import__("os").environ, "PYTHONPATH": str(ROOT / "src")},
     )
+
+
+def test_ui_pages_only_call_application_and_visualization():
+    root = ROOT / "src/psd_analyzer/ui/streamlit_app"
+    forbidden = {
+        "sqlalchemy",
+        "sqlite3",
+        "infrastructure",
+        "numpy",
+        "scipy",
+        "openpyxl",
+        "pandas",
+        "q_fitting",
+        "packing_models",
+        "psd_mixing",
+        "metrics",
+    }
+    for name in ("pages", "components"):
+        _assert_import_boundary(root / name, forbidden)
+
+
+def test_sqlite_adapters_do_not_import_presentation():
+    for name in ("persistence", "repositories"):
+        _assert_import_boundary(
+            ROOT / "src/psd_analyzer/infrastructure" / name,
+            {"streamlit", "plotly", "visualization", "ui"},
+        )

@@ -19,7 +19,7 @@ TEMPLATE_COLUMNS = {
     ),
     "Measurements": (*REQUIRED_COLUMNS["Measurements"], "version"),
     "PSD": REQUIRED_COLUMNS["PSD"],
-    "Recipe": (*REQUIRED_COLUMNS["Recipe"], "recipe_name"),
+    "Recipe": (*REQUIRED_COLUMNS["Recipe"], "recipe_name", "status", "approval_reference"),
 }
 
 
@@ -42,7 +42,8 @@ def generate_excel_template(path: str | Path, *, include_example: bool = True) -
         ("Measurements", "basis is explicit; method and protocol preserve measurement provenance"),
         (
             "Recipe",
-            "Imported versions are drafts; importing never selects a batch or changes production",
+            "Default draft; released/archived require status + external approval_reference "
+            "on every row",
         ),
         (
             "Identity fields",
